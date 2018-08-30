@@ -8,6 +8,18 @@
 /**
  * constructor
  */
+QuorumTracker::QuorumTracker(MessageType type, int transID, string key, string value){
+			this->type = type;
+			this->transID = transID;
+			this->key = string(key);
+			this->value = string(value);
+			this->totalReplies = 0;
+			this->successfulReplies = 0;
+		}
+
+/**
+ * constructor
+ */
 MP2Node::MP2Node(Member *memberNode, Params *par, EmulNet * emulNet, Log * log, Address * address) {
 	this->memberNode = memberNode;
 	this->par = par;
@@ -23,6 +35,23 @@ MP2Node::MP2Node(Member *memberNode, Params *par, EmulNet * emulNet, Log * log, 
 MP2Node::~MP2Node() {
 	delete ht;
 	delete memberNode;
+	for (auto it = quorumTrackers.begin(); it != quorumTrackers.end(); it++){
+		delete(it->second);
+	}
+	quorumTrackers.clear();
+}
+
+/**
+ * FUNCTION NAME: addQuorumTracker
+ *
+ * DESCRIPTION: create a quorum tracker object and add it to this node's tracker list
+ *
+ */
+QuorumTracker * MP2Node::addQuorumTracker(MessageType type, string key, string value) {
+	int transID = g_transID++;
+	QuorumTracker * qt = new QuorumTracker(type, transID, key, value);
+	quorumTrackers[transID] = qt;
+	return qt;
 }
 
 /**
@@ -57,6 +86,7 @@ void MP2Node::updateRing() {
 	 * Step 3: Run the stabilization protocol IF REQUIRED
 	 */
 	// Run stabilization protocol if the hash table size is greater than zero and if there has been a changed in the ring
+	stabilizationProtocol();
 }
 
 /**
