@@ -71,6 +71,8 @@ private:
 	// create a quorum tracker object and add it to this node's tracker list
 	QuorumTracker * addQuorumTracker(MessageType type, string key, string value);
 
+	// send message to replicas
+	void sendMessage(QuorumTracker* qt);
 public:
 	MP2Node(Member *memberNode, Params *par, EmulNet *emulNet, Log *log, Address *addressOfMember);
 	Member * getMemberNode() {

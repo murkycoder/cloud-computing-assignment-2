@@ -9,13 +9,13 @@
  * constructor
  */
 QuorumTracker::QuorumTracker(MessageType type, int transID, string key, string value){
-			this->type = type;
-			this->transID = transID;
-			this->key = string(key);
-			this->value = string(value);
-			this->totalReplies = 0;
-			this->successfulReplies = 0;
-		}
+	this->type = type;
+	this->transID = transID;
+	this->key = string(key);
+	this->value = string(value);
+	this->totalReplies = 0;
+	this->successfulReplies = 0;
+}
 
 /**
  * constructor
@@ -52,6 +52,37 @@ QuorumTracker * MP2Node::addQuorumTracker(MessageType type, string key, string v
 	QuorumTracker * qt = new QuorumTracker(type, transID, key, value);
 	quorumTrackers[transID] = qt;
 	return qt;
+}
+
+/**
+ * FUNCTION NAME: sendMessage
+ *
+ * DESCRIPTION: send message to replicas
+ * 
+ */
+void MP2Node::sendMessage(QuorumTracker* qt){
+	vector<Node> replicas = findNodes(qt->key);
+	assert(replicas.size() == 3);
+	Message msg = Message(qt->transID,
+						  memberNode->addr,
+						  qt->type, 
+						  qt->key, 
+						  qt->value,
+						  PRIMARY);
+	emulNet->ENsend(&memberNode->addr, 
+					&(replicas[0].nodeAddress),
+					msg.toString());
+
+	msg.replica = SECONDARY;
+	emulNet->ENsend(&memberNode->addr, 
+					&(replicas[1].nodeAddress),
+					msg.toString());
+
+	msg.replica = TERTIARY;
+	emulNet->ENsend(&memberNode->addr, 
+					&(replicas[2].nodeAddress),
+					msg.toString());
+	return;
 }
 
 /**
