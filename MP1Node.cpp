@@ -105,7 +105,7 @@ int MP1Node::initThisNode(Address *joinaddr) {
     // node is up!
 	memberNode->nnb = 0;
 	memberNode->heartbeat = 0;
-	memberNode->pingCounter = TFAIL;
+	memberNode->pingCounter = TGOSSIP;
 	memberNode->timeOutCounter = -1;
     initMemberListTable(memberNode);
 
@@ -160,9 +160,10 @@ int MP1Node::introduceSelfToGroup(Address *joinaddr) {
  * DESCRIPTION: Wind up this node and clean up state
  */
 int MP1Node::finishUpThisNode(){
-   /*
-    * Your code goes here
-    */
+   memberNode->inGroup = false;
+   memberNode->nnb = 0;
+   memberNode->memberList.clear();
+   memberNode->heartbeat = 0;
 }
 
 /**
@@ -215,9 +216,28 @@ void MP1Node::checkMessages() {
  * DESCRIPTION: Message handler for different message types
  */
 bool MP1Node::recvCallBack(void *env, char *data, int size ) {
-	/*
-	 * Your code goes here
-	 */
+
+    bool processed = false;
+    MessageHdr msgHdr;
+    memcpy(&msgHdr, data, sizeof(MessageHdr));
+    
+    char * dataWithoutHdr = data + sizeof(MessageHdr);
+
+    switch(msgHdr.msgType){
+        case JOINREQ:
+            processed = processJoinReq(dataWithoutHdr);
+            break;
+        case JOINREP:
+            processed = processJoinRep(dataWithoutHdr);
+            break;
+        case GOSSIP:
+            processed = processGossip(dataWithoutHdr);
+            break;
+        default:
+            break;
+    }
+    return processed;
+    
 }
 
 /**
@@ -228,11 +248,22 @@ bool MP1Node::recvCallBack(void *env, char *data, int size ) {
  * 				Propagate your membership list
  */
 void MP1Node::nodeLoopOps() {
+    // if ping counter expires
+    // then gossip your list to others
+    if(memberNode->pingCounter == 0 ){
+        memberNode->heartbeat++;
+        memberNode->memberList[0].heartbeat++;
+        memberNode->memberList[0].timestamp = par->getcurrtime();
+        gossip();
+        memberNode->pingCounter = TGOSSIP;
+    }
+    // otherwise continue until counter expires
+    else{
+        memberNode->pingCounter--;
+    }
 
-	/*
-	 * Your code goes here
-	 */
-
+    // check for failed nodes in membership list
+    checkForFailures();
     return;
 }
 
@@ -267,6 +298,7 @@ Address MP1Node::getJoinAddress() {
  */
 void MP1Node::initMemberListTable(Member *memberNode) {
 	memberNode->memberList.clear();
+    updateMembershipList(memberNode->addr, memberNode->heartbeat);
 }
 
 /**
@@ -278,4 +310,204 @@ void MP1Node::printAddress(Address *addr)
 {
     printf("%d.%d.%d.%d:%d \n",  addr->addr[0],addr->addr[1],addr->addr[2],
                                                        addr->addr[3], *(short*)&addr->addr[4]) ;    
+}
+/**
+ * FUNCTION NAME: processJoinReq
+ *
+ * DESCRIPTION: 
+ */
+bool MP1Node::processJoinReq(char * data){
+    Address addr;
+    memcpy(&(addr.addr), data, sizeof(Address));
+    long heartbeat;
+    memcpy(&heartbeat, (data + sizeof(Address)), sizeof(long));
+    updateMembershipList(addr, heartbeat);
+
+    size_t msgSize = sizeof(MessageHdr) + sizeof(Address) + sizeof(heartbeat);
+    char * msg = (char *)malloc(msgSize);
+    MessageHdr * msgHdr = (MessageHdr*)msg;
+    msgHdr->msgType = JOINREP;
+    memcpy(msg + sizeof(MessageHdr), &(memberNode->addr), sizeof(Address));
+    memcpy(msg + sizeof(Address) + sizeof(MessageHdr), &(memberNode->heartbeat), sizeof(long));
+
+    emulNet->ENsend(
+        &(memberNode->addr), 
+        &addr,
+        msg,
+        msgSize
+    );
+
+    msgHdr = NULL;
+    free(msg);
+
+    return true;
+}
+/**
+ * FUNCTION NAME: processJoinRep
+ *
+ * DESCRIPTION: 
+ */
+bool MP1Node::processJoinRep(char * data){
+
+    memberNode->inGroup = true;
+    Address addr;
+    memcpy(&(addr.addr), data, sizeof(Address));
+    long heartbeat;
+    memcpy(&heartbeat, (data + sizeof(Address)), sizeof(long));
+    updateMembershipList(addr, heartbeat);
+
+     return true;
+}
+/**
+ * FUNCTION NAME: processGossip
+ *
+ * DESCRIPTION: 
+ */
+bool MP1Node::processGossip(char * data){
+    int listSize;
+    memcpy(&listSize, data, sizeof(int));
+    size_t offset = sizeof(int);
+    for(int i = 0; i < listSize; i++){
+        //Address addr;
+        int id;
+        short port;
+        long heartbeat;
+        memcpy(&id, data + offset, sizeof(int));
+        offset += sizeof(int);
+        memcpy(&port, data + offset, sizeof(short));
+        offset += sizeof(short);
+        memcpy(&heartbeat, data + offset, sizeof(long));
+        offset += sizeof(long);
+        Address addr;
+        memcpy(&(addr.addr[0]), &id, sizeof(int));
+        memcpy(&(addr.addr[4]), &port, sizeof(short));
+            
+        updateMembershipList(addr, heartbeat);
+    }
+    return true;
+}
+/**
+ * FUNCTION NAME: gossip
+ *
+ * DESCRIPTION: 
+ */
+bool MP1Node::gossip(){
+    int timestamp = par->getcurrtime();
+    int listSize = countNonFaulty(timestamp);
+    
+    size_t msgSize = sizeof(MessageHdr) + sizeof(int) +
+                     listSize*(sizeof(Address) + sizeof(long));
+    char * msg = (char *)malloc(msgSize);
+    MessageHdr * msgHdr = (MessageHdr*)msg;
+    msgHdr->msgType = GOSSIP;
+    size_t offset = sizeof(MessageHdr);
+    memcpy(msg + offset, &listSize, sizeof(int));
+    offset += sizeof(int);
+    for( auto it = memberNode->memberList.begin();
+        it != memberNode->memberList.end(); it++){
+            if( timestamp - it->timestamp < TFAIL){
+                memcpy(msg + offset, &(it->id), sizeof(int));
+                offset += sizeof(int);
+                memcpy(msg + offset, &(it->port), sizeof(short));
+                offset += sizeof(short);
+                memcpy(msg + offset, &(it->heartbeat), sizeof(long));
+                offset += sizeof(long);
+        }
+    }
+    for( auto it = memberNode->memberList.begin();
+        it != memberNode->memberList.end(); it++){
+            Address addr;
+            memcpy(&(addr.addr[0]), &(it->id), sizeof(int));
+            memcpy(&(addr.addr[4]), &(it->port), sizeof(short));
+            emulNet->ENsend(&(memberNode->addr), &addr, msg, msgSize);
+    }
+    msgHdr = NULL;
+    free(msg);
+    return true;
+        
+}
+/**
+ * FUNCTION NAME: updateMembershipList
+ *
+ * DESCRIPTION: update / add entry in the membership list 
+ *              
+ *             
+ * RETURN: return true if modification made
+ *                false otherwise
+ */
+bool MP1Node::updateMembershipList(Address addr, long heartbeat){
+    printMembershipList();
+    for( auto it = memberNode->memberList.begin();
+        it != memberNode->memberList.end(); it++){
+            int id;
+            short port;
+            memcpy(&id, &(addr.addr[0]), sizeof(int));
+            memcpy(&port, &(addr.addr[4]), sizeof(short));
+            if(id == it->id && port == it->port) {
+               if(it->heartbeat < heartbeat){
+                    // update in list
+                    it->settimestamp(par->getcurrtime());
+                    it->setheartbeat(heartbeat);
+                    return true;
+                }
+                // else no change
+                return false;
+            }
+    }
+    int id; 
+    short port;
+    memcpy(&id, &(addr.addr[0]), sizeof(int));
+    memcpy(&port, &(addr.addr[4]), sizeof(short));
+    memberNode->memberList.emplace_back(MemberListEntry(id, port, heartbeat, par->getcurrtime()));
+    #ifdef DEBUGLOG
+        log->logNodeAdd(&(memberNode->addr), &addr);
+    #endif
+
+    return true;
+}
+/**
+ * FUNCTION NAME: checkForFailures
+ *
+ * DESCRIPTION: 
+ */
+void MP1Node::checkForFailures(){
+    for(auto it = memberNode->memberList.begin();
+        it != memberNode->memberList.end();
+        ){
+            if(par->getcurrtime() - it->timestamp > TREMOVE){
+                #ifdef DEBUGLOG
+                    Address addr;
+                    memcpy(&(addr.addr[0]), &(it->id), sizeof(int));
+                    memcpy(&(addr.addr[4]), &(it->port), sizeof(short));
+                    log->logNodeRemove(&memberNode->addr, &addr);
+                #endif
+                it = memberNode->memberList.erase(it);
+            } else {
+                it++;
+            }
+    }
+}
+/**
+ * FUNCTION NAME: printMembershipList
+ *
+ * DESCRIPTION: 
+ */
+void MP1Node::printMembershipList(){
+    printf("[ %d ] Member list\n");
+    for(auto it = memberNode->memberList.begin();
+        it != memberNode->memberList.end();
+        it++){
+            printf("\t%d:%d\t%ld\t%d\n", it->id, it->port, it->heartbeat, it->timestamp);
+    }
+    printf("\n");
+}
+int MP1Node::countNonFaulty(int timestamp){
+    int count = 0;
+    for(auto it = memberNode->memberList.begin();
+        it != memberNode->memberList.end();
+        it++){
+            if(timestamp - it->timestamp < TFAIL)  
+                count++;
+    }
+    return count;
 }
