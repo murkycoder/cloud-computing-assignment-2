@@ -224,10 +224,14 @@ void MP2Node::clientDelete(string key){
  * 			   	2) Return true or false based on success or failure
  */
 bool MP2Node::createKeyValue(int transID, string key, string value, ReplicaType replica) {
-	/*
-	 * Implement this
-	 */
 	// Insert key, value, replicaType into the hash table
+	if(ht->create(key, value)) {
+		log->logCreateSuccess(&memberNode->addr, false, transID, key, value);
+		return true;
+	} else {
+		log->logCreateFail(&memberNode->addr, false, transID, key, value);
+		return false;
+	}
 }
 
 /**
@@ -239,10 +243,14 @@ bool MP2Node::createKeyValue(int transID, string key, string value, ReplicaType 
  * 			    2) Return value
  */
 string MP2Node::readKey(int transID, string key) {
-	/*
-	 * Implement this
-	 */
 	// Read key from local hash table and return value
+	string value = ht->read(key);
+	if(value != "") {
+		log->logReadSuccess(&memberNode->addr, false, transID, key, value);
+	} else {
+		log->logReadFail(&memberNode->addr, false, transID, key);
+	}
+	return value;
 }
 
 /**
@@ -254,10 +262,14 @@ string MP2Node::readKey(int transID, string key) {
  * 				2) Return true or false based on success or failure
  */
 bool MP2Node::updateKeyValue(int transID, string key, string value, ReplicaType replica) {
-	/*
-	 * Implement this
-	 */
 	// Update key in local hash table and return true or false
+	if(ht->update(key, value)) {
+		log->logUpdateSuccess(&memberNode->addr, false, transID, key, value);
+		return true;
+	} else {
+		log->logUpdateFail(&memberNode->addr, false, transID, key, value);
+		return false;
+	}
 }
 
 /**
@@ -269,10 +281,14 @@ bool MP2Node::updateKeyValue(int transID, string key, string value, ReplicaType 
  * 				2) Return true or false based on success or failure
  */
 bool MP2Node::deletekey(int transID, string key) {
-	/*
-	 * Implement this
-	 */
 	// Delete the key from the local hash table
+	if(ht->deleteKey(key)) {
+		log->logDeleteSuccess(&memberNode->addr, false, transID, key);
+		return true;
+	} else {
+		log->logDeleteFail(&memberNode->addr, false, transID, key);
+		return false;
+	}
 }
 
 /**
