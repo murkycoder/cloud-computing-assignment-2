@@ -36,7 +36,8 @@ MP2Node::~MP2Node() {
 	delete ht;
 	delete memberNode;
 	for (auto it = quorumTrackers.begin(); it != quorumTrackers.end(); it++){
-		delete(it->second);
+		QuorumTracker * qt = it->second;
+		delete qt;
 	}
 	quorumTrackers.clear();
 }
@@ -62,27 +63,28 @@ QuorumTracker * MP2Node::addQuorumTracker(MessageType type, string key, string v
  */
 void MP2Node::sendMessage(QuorumTracker* qt){
 	vector<Node> replicas = findNodes(qt->key);
-	assert(replicas.size() == 3);
-	Message msg = Message(qt->transID,
-						  memberNode->addr,
-						  qt->type, 
-						  qt->key, 
-						  qt->value,
-						  PRIMARY);
-	emulNet->ENsend(&memberNode->addr, 
-					&(replicas[0].nodeAddress),
-					msg.toString());
+	if(replicas.size() >= 3){
+		Message msg = Message(qt->transID,
+							memberNode->addr,
+							qt->type, 
+							qt->key, 
+							qt->value,
+							PRIMARY);
+		emulNet->ENsend(&memberNode->addr, 
+						&(replicas[0].nodeAddress),
+						msg.toString());
 
-	msg.replica = SECONDARY;
-	emulNet->ENsend(&memberNode->addr, 
-					&(replicas[1].nodeAddress),
-					msg.toString());
+		msg.replica = SECONDARY;
+		emulNet->ENsend(&memberNode->addr, 
+						&(replicas[1].nodeAddress),
+						msg.toString());
 
-	msg.replica = TERTIARY;
-	emulNet->ENsend(&memberNode->addr, 
-					&(replicas[2].nodeAddress),
-					msg.toString());
-	return;
+		msg.replica = TERTIARY;
+		emulNet->ENsend(&memberNode->addr, 
+						&(replicas[2].nodeAddress),
+						msg.toString());
+		return;
+	}
 }
 
 /**
@@ -419,6 +421,50 @@ void MP2Node::checkMessages() {
  */
 void MP2Node::checkForQuorum(int transID) {
 
+	if (quorumTrackers.find(transID) == quorumTrackers.end())
+		return;
+
+	QuorumTracker * qt = quorumTrackers[transID];
+
+	if (qt->successfulReplies == 2) {
+		switch(qt->type) {
+			case CREATE:
+				log->logCreateSuccess(&memberNode->addr, true, qt->transID, qt->key, qt->value);
+				break;
+			case READ:
+				log->logReadSuccess(&memberNode->addr, true,  qt->transID, qt->key, qt->value);
+				break;
+			case UPDATE:
+				log->logUpdateSuccess(&memberNode->addr, true,  qt->transID, qt->key, qt->value);
+				break;
+			case DELETE:
+				log->logDeleteSuccess(&memberNode->addr, true,  qt->transID, qt->key);
+				break;
+			default:
+				break;
+		}
+		quorumTrackers.erase(qt->transID);
+		free(qt);
+	} else if (qt->totalReplies == 3 && qt->successfulReplies < 2) {
+		switch(qt->type) {
+			case CREATE:
+				log->logCreateFail(&memberNode->addr, true,  qt->transID, qt->key, qt->value);
+				break;
+			case READ:
+				log->logReadFail(&memberNode->addr, true, qt->transID, qt->key);
+				break;
+			case UPDATE:
+				log->logUpdateFail(&memberNode->addr, true, qt->transID, qt->key, qt->value);
+				break;
+			case DELETE:
+				log->logDeleteFail(&memberNode->addr, true,  qt->transID, qt->key);
+				break;
+			default:
+				break;
+		}
+		quorumTrackers.erase(qt->transID);
+		free(qt);
+	}
 }
 
 /**
@@ -495,7 +541,5 @@ int MP2Node::enqueueWrapper(void *env, char *buff, int size) {
  *				Note:- "CORRECT" replicas implies that every key is replicated in its two neighboring nodes in the ring
  */
 void MP2Node::stabilizationProtocol() {
-	/*
-	 * Implement this
-	 */
+	
 }

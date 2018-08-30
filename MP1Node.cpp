@@ -436,7 +436,7 @@ bool MP1Node::gossip(){
  *                false otherwise
  */
 bool MP1Node::updateMembershipList(Address addr, long heartbeat){
-    printMembershipList();
+    //printMembershipList();
     for( auto it = memberNode->memberList.begin();
         it != memberNode->memberList.end(); it++){
             int id;
@@ -493,7 +493,7 @@ void MP1Node::checkForFailures(){
  * DESCRIPTION: 
  */
 void MP1Node::printMembershipList(){
-    printf("[ %d ] Member list\n");
+    printf("[ %d ] Member list\n", (int*)memberNode->addr.addr[0]);
     for(auto it = memberNode->memberList.begin();
         it != memberNode->memberList.end();
         it++){
