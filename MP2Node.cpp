@@ -169,9 +169,8 @@ size_t MP2Node::hashFunction(string key) {
  * 				3) Sends a message to the replica
  */
 void MP2Node::clientCreate(string key, string value) {
-	/*
-	 * Implement this
-	 */
+	QuorumTracker * qt = addQuorumTracker(CREATE, key, value);
+	sendMessage(qt);
 }
 
 /**
@@ -184,9 +183,8 @@ void MP2Node::clientCreate(string key, string value) {
  * 				3) Sends a message to the replica
  */
 void MP2Node::clientRead(string key){
-	/*
-	 * Implement this
-	 */
+	QuorumTracker * qt = addQuorumTracker(READ, key, "");
+	sendMessage(qt);
 }
 
 /**
@@ -199,9 +197,8 @@ void MP2Node::clientRead(string key){
  * 				3) Sends a message to the replica
  */
 void MP2Node::clientUpdate(string key, string value){
-	/*
-	 * Implement this
-	 */
+	QuorumTracker * qt = addQuorumTracker(UPDATE, key, "");
+	sendMessage(qt);
 }
 
 /**
@@ -214,9 +211,8 @@ void MP2Node::clientUpdate(string key, string value){
  * 				3) Sends a message to the replica
  */
 void MP2Node::clientDelete(string key){
-	/*
-	 * Implement this
-	 */
+	QuorumTracker * qt = addQuorumTracker(DELETE, key, "");
+	sendMessage(qt);
 }
 
 /**
