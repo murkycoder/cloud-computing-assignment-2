@@ -73,6 +73,12 @@ private:
 
 	// send message to replicas
 	void sendMessage(QuorumTracker* qt);
+
+	// check for quorum for given transaction ID
+	void checkForQuorum(int transID);
+
+	void checkForFailuresAndQuorum();
+
 public:
 	MP2Node(Member *memberNode, Params *par, EmulNet *emulNet, Log *log, Address *addressOfMember);
 	Member * getMemberNode() {

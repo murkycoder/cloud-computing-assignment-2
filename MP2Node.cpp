@@ -319,20 +319,117 @@ void MP2Node::checkMessages() {
 		size = memberNode->mp2q.front().size;
 		memberNode->mp2q.pop();
 
-		string message(data, data + size);
-
+		Message *rvcdMsg = new Message(string(data, data + size));
+		Message *replyMsg;
 		/*
 		 * Handle the message types here
 		 */
+		switch(rvcdMsg->type) {
+			case CREATE:
+				replyMsg = new Message(rvcdMsg->transID,	
+									   memberNode->addr,
+									   REPLY,
+									   false);
+				replyMsg->success = createKeyValue(rvcdMsg->transID,
+												   rvcdMsg->key,
+												   rvcdMsg->value, 
+												   rvcdMsg->replica);
+				emulNet->ENsend(&memberNode->addr,
+								&rvcdMsg->fromAddr,
+								replyMsg->toString());
+				delete(replyMsg);	
+				break;
+
+			case READ:
+				replyMsg = new Message(rvcdMsg->transID,	
+									   memberNode->addr,
+									   READREPLY,
+									   "");
+				replyMsg->value = readKey(rvcdMsg->transID,
+										  rvcdMsg->key);
+				emulNet->ENsend(&memberNode->addr,
+								&rvcdMsg->fromAddr,
+								replyMsg->toString());
+				delete(replyMsg);	
+				break;
+
+			case UPDATE:
+			 	replyMsg = new Message(rvcdMsg->transID,	
+									   memberNode->addr,
+									   REPLY,
+									   false);
+				replyMsg->success = updateKeyValue(rvcdMsg->transID,
+												   rvcdMsg->key,
+												   rvcdMsg->value, 
+												   rvcdMsg->replica);
+				emulNet->ENsend(&memberNode->addr,
+								&rvcdMsg->fromAddr,
+								replyMsg->toString());
+				delete(replyMsg);	
+				break;
+			case DELETE:
+				replyMsg = new Message(rvcdMsg->transID,	
+									   memberNode->addr,
+									   REPLY,
+									   false);
+				replyMsg->success = deletekey(rvcdMsg->transID,
+												   rvcdMsg->key);
+				emulNet->ENsend(&memberNode->addr,
+								&rvcdMsg->fromAddr,
+								replyMsg->toString());
+				delete(replyMsg);	
+				break;
+			case REPLY:
+				if(quorumTrackers.find(rvcdMsg->transID) != quorumTrackers.end()){
+					QuorumTracker * qt = quorumTrackers[rvcdMsg->transID];
+					qt->totalReplies++;
+					if(rvcdMsg->success)
+						qt->successfulReplies++;
+					checkForQuorum(rvcdMsg->transID);
+				}
+				break;
+			case READREPLY:
+				if(quorumTrackers.find(rvcdMsg->transID) != quorumTrackers.end()){
+					QuorumTracker * qt = quorumTrackers[rvcdMsg->transID];
+					qt->totalReplies++;
+					if(rvcdMsg->value != ""){
+						qt->successfulReplies++;
+						qt->value = rvcdMsg->value;
+					}
+					checkForQuorum(rvcdMsg->transID);
+				}
+				break;
+			default:
+				break;
+		}
 
 	}
-
 	/*
 	 * This function should also ensure all READ and UPDATE operation
 	 * get QUORUM replies
 	 */
+	checkForFailuresAndQuorum();
 }
 
+/**
+ * FUNCTION NAME: checkForQuorum
+ *
+ * DESCRIPTION: check for quorum for quorumTrackers
+ * 
+ */
+void MP2Node::checkForQuorum(int transID) {
+
+}
+
+/**
+ * FUNCTION NAME: checkForQuorum
+ *
+ * DESCRIPTION: check for quorum for quorumTrackers
+ * 
+ */
+void MP2Node::checkForFailuresAndQuorum() {
+
+}
 /**
  * FUNCTION NAME: findNodes
  *
