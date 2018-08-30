@@ -223,7 +223,7 @@ void MP2Node::clientDelete(string key){
  * 			   	1) Inserts key value into the local hash table
  * 			   	2) Return true or false based on success or failure
  */
-bool MP2Node::createKeyValue(string key, string value, ReplicaType replica) {
+bool MP2Node::createKeyValue(int transID, string key, string value, ReplicaType replica) {
 	/*
 	 * Implement this
 	 */
@@ -238,7 +238,7 @@ bool MP2Node::createKeyValue(string key, string value, ReplicaType replica) {
  * 			    1) Read key from local hash table
  * 			    2) Return value
  */
-string MP2Node::readKey(string key) {
+string MP2Node::readKey(int transID, string key) {
 	/*
 	 * Implement this
 	 */
@@ -253,7 +253,7 @@ string MP2Node::readKey(string key) {
  * 				1) Update the key to the new value in the local hash table
  * 				2) Return true or false based on success or failure
  */
-bool MP2Node::updateKeyValue(string key, string value, ReplicaType replica) {
+bool MP2Node::updateKeyValue(int transID, string key, string value, ReplicaType replica) {
 	/*
 	 * Implement this
 	 */
@@ -268,7 +268,7 @@ bool MP2Node::updateKeyValue(string key, string value, ReplicaType replica) {
  * 				1) Delete the key from the local hash table
  * 				2) Return true or false based on success or failure
  */
-bool MP2Node::deletekey(string key) {
+bool MP2Node::deletekey(int transID, string key) {
 	/*
 	 * Implement this
 	 */

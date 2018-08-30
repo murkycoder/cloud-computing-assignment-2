@@ -105,10 +105,10 @@ public:
 	vector<Node> findNodes(string key);
 
 	// server
-	bool createKeyValue(string key, string value, ReplicaType replica);
-	string readKey(string key);
-	bool updateKeyValue(string key, string value, ReplicaType replica);
-	bool deletekey(string key);
+	bool createKeyValue(int transID, string key, string value, ReplicaType replica);
+	string readKey(int transID, string key);
+	bool updateKeyValue(int transID, string key, string value, ReplicaType replica);
+	bool deletekey(int transID, string key);
 
 	// stabilization protocol - handle multiple failures
 	void stabilizationProtocol();
