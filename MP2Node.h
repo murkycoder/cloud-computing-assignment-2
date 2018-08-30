@@ -20,6 +20,23 @@
 #include "Queue.h"
 
 /**
+ * CLASS NAME: QuorumTracker
+ *
+ * DESCRIPTION: Custom class to represent a quorum state
+ * 
+ */ 
+class QuorumTracker {
+	public:
+		int totalReplies;
+		int successfulReplies;
+		string key;
+		string value;
+		MessageType type;
+		int transID;
+		QuorumTracker(MessageType type, int transID, string key, string value);
+};
+
+/**
  * CLASS NAME: MP2Node
  *
  * DESCRIPTION: This class encapsulates all the key-value store functionality
@@ -47,6 +64,12 @@ private:
 	EmulNet * emulNet;
 	// Object of Log
 	Log * log;
+
+	// map to keep track of quorums initiated by this node
+	map<int, QuorumTracker* > quorumTrackers;
+
+	// create a quorum tracker object and add it to this node's tracker list
+	QuorumTracker * addQuorumTracker(MessageType type, string key, string value);
 
 public:
 	MP2Node(Member *memberNode, Params *par, EmulNet *emulNet, Log *log, Address *addressOfMember);
